@@ -1,0 +1,103 @@
+diff --git a/cpuexec.cpp b/cpuexec.cpp
+index 0494810..129683d 100644
+--- a/cpuexec.cpp
++++ b/cpuexec.cpp
+@@ -5,6 +5,7 @@
+ \*****************************************************************************/
+ 
+ #include "snes9x.h"
++#include "getset.h"
+ #include "memmap.h"
+ #include "cpuops.h"
+ #include "dma.h"
+@@ -168,6 +169,7 @@ void S9xMainLoop (void)
+ 				Opcodes = S9xOpcodesSlow;
+ 		}
+ 
++		tw_op_pc = Registers.PBPC; if (tw_mode & 4) tw_exec(Registers.PBPC);
+ 		Registers.PCw++;
+ 		(*Opcodes[Op].S9xOpcode)();
+ 
+diff --git a/getset.h b/getset.h
+index bd3b365..3c89745 100644
+--- a/getset.h
++++ b/getset.h
+@@ -18,6 +18,9 @@
+ #include "bsx.h"
+ #include "msu1.h"
+ 
++
++extern "C" { extern int tw_mode; extern unsigned tw_lo, tw_hi, tw_op_pc; void tw_log(int kind, unsigned addr, unsigned val); void tw_exec(unsigned pc); }
++static inline unsigned tw_wram(unsigned a){ a&=0xffffff; unsigned b=a>>16; if(b==0x7e||b==0x7f) return a-0x7e0000; if((b<0x40||(b>=0x80&&b<0xc0))&&(a&0xffff)<0x2000) return a&0x1fff; return 0xffffffffu; }
+ #define addCyclesInMemoryAccess \
+ 	if (!CPU.InDMAorHDMA) \
+ 	{ \
+@@ -57,6 +60,7 @@ static inline int32 memory_speed (uint32 address)
+ 
+ inline uint8 S9xGetByte (uint32 Address)
+ {
++	if (tw_mode & 2) { unsigned w = tw_wram(Address); if (w >= tw_lo && w <= tw_hi) tw_log(2, w, 0); }
+ 	int		block = (Address & 0xffffff) >> MEMMAP_SHIFT;
+ 	uint8	*GetAddress = Memory.Map[block];
+ 	int32	speed = memory_speed(Address);
+@@ -203,6 +207,7 @@ inline uint16 S9xGetWord (uint32 Address, enum s9xwrap_t w = WRAP_NONE)
+ 
+ 	if (GetAddress >= (uint8 *) CMemory::MAP_LAST)
+ 	{
++		if (tw_mode & 2) { unsigned w0 = tw_wram(Address); if (w0 != 0xffffffffu && w0 + 1 >= tw_lo && w0 <= tw_hi) tw_log(2, w0, 0); }
+ 		word = READ_WORD(GetAddress + (Address & 0xffff));
+ 		addCyclesInMemoryAccess_x2;
+ 		return (word);
+@@ -339,6 +344,7 @@ inline uint16 S9xGetWord (uint32 Address, enum s9xwrap_t w = WRAP_NONE)
+ 
+ inline void S9xSetByte (uint8 Byte, uint32 Address)
+ {
++	if (tw_mode & 1) { unsigned w = tw_wram(Address); if (w >= tw_lo && w <= tw_hi) tw_log(1, w, Byte); }
+ 	int		block = (Address & 0xffffff) >> MEMMAP_SHIFT;
+ 	uint8	*SetAddress = Memory.WriteMap[block];
+ 	int32	speed = memory_speed(Address);
+@@ -490,6 +496,7 @@ inline void S9xSetWord (uint16 Word, uint32 Address, enum s9xwrap_t w = WRAP_NON
+ 
+ 	if (SetAddress >= (uint8 *) CMemory::MAP_LAST)
+ 	{
++		if (tw_mode & 1) { unsigned w0 = tw_wram(Address); if (w0 != 0xffffffffu && w0 + 1 >= tw_lo && w0 <= tw_hi) { if (w0 >= tw_lo) tw_log(1, w0, Word & 0xff); if (w0 + 1 <= tw_hi) tw_log(1, w0 + 1, Word >> 8); } }
+ 		WRITE_WORD(SetAddress + (Address & 0xffff), Word);
+ 		addCyclesInMemoryAccess_x2;
+ 		return;
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+index b7aaace..0655bec 100644
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -2246,8 +2246,22 @@ static void report_buttons()
+     }
+ }
+ 
++
++extern "C" {
++int tw_mode=0; unsigned tw_lo=0, tw_hi=0, tw_op_pc=0, tw_frame=0;
++struct TwRec { unsigned frame, kind, addr, val, pc; };
++static TwRec *tw_buf=0; static unsigned tw_n=0; static const unsigned TW_MAX=2000000;
++static unsigned *tw_pcs=0; static unsigned tw_pn=0; static const unsigned TW_PMAX=8000000;
++void tw_log(int kind, unsigned addr, unsigned val){ if(!tw_buf) tw_buf=(TwRec*)malloc(sizeof(TwRec)*TW_MAX); if(tw_n<TW_MAX){ TwRec r={tw_frame,(unsigned)kind,addr,val,tw_op_pc}; tw_buf[tw_n++]=r; } }
++void tw_exec(unsigned pc){ if(!tw_pcs) tw_pcs=(unsigned*)malloc(4*TW_PMAX); if(tw_pn<TW_PMAX) tw_pcs[tw_pn++]=pc; }
++void tw_set(int mode, unsigned lo, unsigned hi){ tw_mode=mode; tw_lo=lo; tw_hi=hi; }
++void tw_clear(){ tw_n=0; tw_pn=0; }
++unsigned tw_count(){ return tw_n; } void* tw_data(){ return tw_buf; }
++unsigned tw_pcount(){ return tw_pn; } void* tw_pdata(){ return tw_pcs; }
++}
+ void retro_run()
+ {
++    tw_frame++;
+     static uint16 height = PPU.ScreenHeight;
+     bool updated = false;
+     if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
+diff --git a/libretro/link.T b/libretro/link.T
+index 9e82b5d..de2ab86 100644
+--- a/libretro/link.T
++++ b/libretro/link.T
+@@ -1,4 +1,4 @@
+ {
+-   global: retro_*;
++   global: retro_*; tw_*;
+    local: *;
+ };
