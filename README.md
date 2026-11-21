@@ -1,6 +1,6 @@
 # Magic Sword: Ally Synergy
 
-This is a ROM hack for Magic Sword (SNES) that doubles down on the ally system, giving the allies *impactful* abilities that make every switch a real strategic choice, and a lot of fun. It weaves in a bunch of new RPG-lite features that I've always thought the game was missing, like saved games and an automap system so you can plan where in your run you'll take advantage of each ally. It also brings back the arcade's missing high score table, so your best runs live forever.
+This is a ROM hack for Magic Sword (SNES) that doubles down on the ally system, giving the allies *impactful* abilities that make every switch a real strategic choice, and a lot of fun. It weaves in a bunch of new RPG-lite features that I've always thought the game was missing, like saved runs and an automap that lets you plan where in your run to use each ally. It also brings back the arcade's high score table, so your best runs live forever.
 
 **Contents:** [Concept](#concept) · [New Ally Abilities](#new-ally-abilities) · [Features](#features) · [Ally Details](#ally-details) · [Text Changes](#text-changes) · [Patching](#patching) · [Credits](#credits)
 
