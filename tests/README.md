@@ -30,3 +30,11 @@ are not a turnkey test suite.
 | `end2.py` | the good ending's high score entry |
 | `textdump.py` | dumps the original and new texts |
 | `loadst.py`, `unrzip.py` | loading raw and RetroArch (RZIP) save states |
+
+## Other emulators (bsnes, Mesen-S)
+`lr.py` runs any libretro core: `CORE=/path/to/core.so python3 script.py` (`SETV='bsnes_entropy=High'` sets a core option). The bsnes (accuracy profile) and Mesen-S libretro cores need small patches to expose WRAM/SRAM and the CPU position: `bsnes_hooks.patch` (also `MS_WRAM_JUNK=lo-hi[,lo-hi]` and `MS_SEED=n` to start chosen WRAM ranges with reproducible random bytes) and `mesen_s_hooks.patch`.
+| Script | Checks |
+|---|---|
+| `xlib.py` | reach any floor from power-on on any core: a crafted SRAM slot plus RESUME (no emulator-specific save states) |
+| `xseeds.py`, `xj.py`, `xdd.py` | resume with random power-on RAM: many patterns, one pattern, and delta-debugging the junk down to the bytes that matter (found the v124 sound-queue bug) |
+| `xres3.py`, `xcmp.py` | START-flow resume / new game on bsnes or Mesen-S, with the CPU position read back to tell a freeze in the sound upload from a slow menu |

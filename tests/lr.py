@@ -16,23 +16,36 @@ def m(*ids):
     return v
 class Core:
     def __init__(s,so,rom):
-        s.l=CDLL(so); s.pad=[0,0]; s.fb=None; s.fmt=2; s.vars={}
+        so=os.environ.get('CORE') or so          # CORE=/path/to/other_core.so runs the same script on bsnes / Mesen-S
+        s.so=so; s.l=CDLL(so); s.pad=[0,0]; s.fb=None; s.fmt=0; s.vars={}; s.hooks=hasattr(s.l,'tw_set')
         s._env=ENV(s.env); s._vid=VID(s.vid); s._aud=AUD(lambda a,b:None); s._audb=AUDB(lambda d,n:n)
         s._poll=POLL(lambda:None); s._inp=INP(s.inp)
+        late='mesen' in so.lower()      # Mesen-S creates its renderer in retro_load_game: callbacks go in after it
+        def cbs():
+            s.l.retro_set_video_refresh(s._vid); s.l.retro_set_audio_sample(s._aud); s.l.retro_set_audio_sample_batch(s._audb)
+            s.l.retro_set_input_poll(s._poll); s.l.retro_set_input_state(s._inp)
         s.l.retro_set_environment(s._env)
-        s.l.retro_set_video_refresh(s._vid); s.l.retro_set_audio_sample(s._aud); s.l.retro_set_audio_sample_batch(s._audb)
-        s.l.retro_set_input_poll(s._poll); s.l.retro_set_input_state(s._inp)
+        if not late: cbs()
         s.l.retro_init()
         s.data=open(rom,'rb').read(); s.buf=C.create_string_buffer(s.data,len(s.data))
         i=Info(rom.encode(),cast(s.buf,c_void_p),len(s.data),None); assert s.l.retro_load_game(byref(i))
+        if late: cbs()
         s.l.retro_get_memory_data.restype=c_void_p; s.l.retro_get_memory_size.restype=c_size_t
-        s.l.tw_data.restype=c_void_p; s.l.tw_pdata.restype=c_void_p
-        s.l.tw_count.restype=c_uint; s.l.tw_pcount.restype=c_uint
-        s.l.tw_set.argtypes=[c_int,c_uint,c_uint]
+        if s.hooks:
+            s.l.tw_data.restype=c_void_p; s.l.tw_pdata.restype=c_void_p
+            s.l.tw_count.restype=c_uint; s.l.tw_pcount.restype=c_uint
+            s.l.tw_set.argtypes=[c_int,c_uint,c_uint]
     def env(s,cmd,p):
+        cmd&=0xffff
         if cmd==10: s.fmt=cast(p,POINTER(c_uint))[0]; return True
         if cmd==3: cast(p,POINTER(c_bool))[0]=True; return True
         if cmd in(9,31): cast(p,POINTER(c_char_p))[0]=b'/tmp'; return True
+        if cmd==15:      # GET_VARIABLE: SETV='bsnes_entropy=High,bsnes_ppu_fast=OFF'
+            k=cast(p,POINTER(c_char_p))[0]
+            for kv in os.environ.get('SETV','').split(','):
+                if '=' in kv and kv.split('=')[0].encode()==k:
+                    s.vars[k]=kv.split('=')[1].encode(); cast(p,POINTER(c_char_p))[1]=s.vars[k]; return True
+            return False
         return False
     def vid(s,d,w,h,pitch):
         if d: s.fb=(w,h,pitch,string_at(d,h*pitch))

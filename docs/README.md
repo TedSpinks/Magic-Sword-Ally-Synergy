@@ -6,7 +6,7 @@ development history says what changed when.
 
 | File | Contents |
 |---|---|
-| `DEV_HISTORY.md` | Internal builds v45 to v120 (v120 = release 1.0.0): what changed, why, and how it was checked |
+| `DEV_HISTORY.md` | Internal builds v45 to v124 (v123 = release 1.0.0, v124 = release 1.0.1): what changed, why, and how it was checked |
 | `PERK_DECISIONS.md` | The ally perks: decisions, findings and implementation notes |
 | `DOOR_CONTENTS.md` | Cell doors on every floor, what each contents id does, and the original game's door shuffle |
 | `HIDDEN_DOORS.md` | The six hidden warp doors and how they trigger |

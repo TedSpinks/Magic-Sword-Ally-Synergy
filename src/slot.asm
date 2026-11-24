@@ -255,6 +255,10 @@ TitleStart:
 SlotScene:
     sep #$20
     rep #$10
+    phb                     ; v124: empty the sound-effect queue ($0B20-$0BFF) first: at power-on it holds random bytes, and SndTick below would send them to the SPC as
+    pea $8080 : plb : plb   ; commands (found with bsnes random power-on RAM: the song upload that follows RESUME then waits forever for the SPC)
+    jsl $80F40C
+    plb
     ; v35: the floor-select (tower) background: BG1/BG2 use palettes 2-3, BG3 text palettes 0-7 (colours 0-31)
     %call($C4E5)
     %call($C515)

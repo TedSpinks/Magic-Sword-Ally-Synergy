@@ -11,7 +11,7 @@ Output goes to out/ by default (not committed).  Needs asar 1.9x (tools/asar or 
 import sys, os, shutil, subprocess, tempfile, zipfile, zlib, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-VERSION = '1.0.0'
+VERSION = '1.0.1'
 NAME = 'MagicSword_AllySynergy'
 CLEAN_CRC32 = 0x27325E4D                       # Magic Sword (USA), 1 MB, no header
 CLEAN_SHA1 = '0d64ef4149b71d13d287122f58eca9c580fa7d0f'

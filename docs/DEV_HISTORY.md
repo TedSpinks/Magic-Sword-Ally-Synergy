@@ -1,6 +1,6 @@
 # Development history
 
-Internal build numbers (v45 to v123). Build v123 is release 1.0.0. Addresses are SNES LoROM; "the author" is the project's author and playtester.
+Internal build numbers (v45 to v124). Build v123 is release 1.0.0; build v124 is release 1.0.1. Addresses are SNES LoROM; "the author" is the project's author and playtester.
 
 ## v45
 Fixed: save slot screen (and the recorded best-credit floor) read the floor from $0404 (ones digit shown by the HUD) instead of $0403 (the floor number). FLOOR 22 showed as 02. Slot screen now reads run-state byte +$10 ($0403); RecordBest stores $0403. Existing best-credit floors already saved in SRAM keep the old (ones digit) value until that slot is replayed.
@@ -399,3 +399,10 @@ The SNES version has no boss on floor 17, so floor 16 no longer gets the BOSS AF
 - Cause: `LogPut` moves an icon right until it finds free strip tiles. On a right-to-left floor the records come right to left, so the Thief (tile 73) was placed first and the Wizard (tile 57, a 3-tile icon running into the Thief's) was pushed right past him. v121 and earlier had the same swap (also on floor 20).
 - Fix (logpage.asm): on a right-to-left floor (`!LgRev`) LogPut looks left first (`$0784` = direction, `$0786` = the tile the icon belongs at); if it reaches the end cap (tile 0) it looks right from the original tile as before. Other floors unchanged.
 - Checked: floor 20 at scroll 482 (Thief door on screen, Wizard door just left of it): v122 exit, chest, Thief, Wizard; v123 exit, chest, Wizard, Thief, Thief inside the box (OAM read back); pause view on every floor vs v122: only the screens showing floor 20 differ; pause-view state check on floors 6, 10 and 20: identical to a plain pause.
+
+## v124 - Slot screen: empty the sound-effect queue first (found by cross-emulator testing)
+- Found with bsnes (accuracy core, random power-on RAM) and Mesen-S (random RAM by default): RESUME from the slot screen froze the game about 3 times in 4 on bsnes. The game's song upload (`$88:81F6`) waited forever for the sound chip's ready signal (`$BBAA` on `$2140`). Snes9x fills RAM with `$55` and never showed it; a real console powers on with random RAM too.
+- Cause: the sound-effect queue (`$0B20-$0BFF`) holds random bytes at power-on, and the slot screen's loop calls `SndTick` (`$80:F3EE`), which sends one queued command to the sound chip per frame. Random commands left the sound driver in a state that never answered the next song upload. The original game never ticks that queue before the game itself has emptied it. Found by delta-debugging the random junk down to the single chunk `$0B00-$0BFF` (bsnes hook: `MS_WRAM_JUNK`, `MS_SEED`).
+- Fix (slot.asm): `SlotScene` calls `$80:F40C` (the game's queue-empty routine) first, as the CODEX entry already did (v82).
+- Checked: bsnes, resume flow, 15 random power-on patterns (seeds 10-24): v123 froze on 11, v124 on 0. Snes9x: slot screen and resumed floor pictures identical to v123, WRAM differs only in stack residue (`$01D9-$01F7`).
+- Not yet confirmed on Mesen-S: its title screen often ignored the scripted START presses (same for v123 and v124), so only one v123 freeze (the same upload wait) and one clean v124 resume were seen there.
