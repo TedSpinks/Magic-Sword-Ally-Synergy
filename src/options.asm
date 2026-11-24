@@ -703,7 +703,7 @@ assert pc() <= $86EA00
 ; v109: CODEX ally pages in the order the allies first turn up in the game: Big Man, Amazon (floor 0), Ninja, Thief
 ; (floor 1), Cleric, Wizard (floor 2), Knight (floor 9), Lizardman (floor 17).  $0462 is the game's ally-screen
 ; number (the attract loop's order: 0 Big Man, 1 Knight, 2 Ninja, 3 Cleric, 4 Amazon, 5 Wizard, 6 Lizardman, 7 Thief).
-org $86E780
+org $86E7A0
 AllyOrder:                  ; JSL from CodexEnter: A (8-bit) = CODEX page 3-10 -> $0462.  M=8 X=16; keeps X
     phx
     rep #$30

@@ -7,7 +7,7 @@ Details that don't belong in the README: building, how the patch is put together
 
 | Patch | IPS size | Patched ROM size | Patched ROM CRC32 |
 |---|---|---|---|
-| `MagicSword_AllySynergy.ips` | 64,090 B | 1 MB | `F15F25E8` |
+| `MagicSword_AllySynergy.ips` | 64,092 B | 1 MB | `90D255DB` |
 
 ## Building
 `python3 build.py "/path/to/Magic Sword (USA).sfc" [outdir]` (output goes to `out/` by default, which is not committed):
@@ -52,7 +52,7 @@ The `.bin` and `.inc` files in `src/` are generated data (icon tiles, map strip 
 - **The header checksum** is correct in the patched ROM.
 
 ## Testing
-Run on Snes9x (libretro, with a few memory-inspection hooks: `tests/tw_core.patch`) through a Python driver (`tests/lr.py`). The main checks for 1.0.0 (re-run on the slot screen and resume flow for 1.0.1):
+Run on Snes9x (libretro, with a few memory-inspection hooks: `tests/tw_core.patch`) through a Python driver (`tests/lr.py`). The main checks for 1.0.0 (re-run on the slot screen, resume flow and attract loop for 1.0.1 and 1.0.2):
 - **Pause view memory safety** (`tests/pv8.py`): on every floor 1-54, at several points while walking and fighting (and through every boss), pause -> Thief's Log -> back gives the same screen, VRAM, CGRAM, OAM, PPU/DMA registers and WRAM as a plain pause, outside the documented backup areas. START from the view vs a plain unpause, compared frame by frame.
 - **Live floor list** (`tests/wl1.py`, `tests/lv2.py`): the game's live floor list keeps every record's position during play on every floor; the pause map matches the unshuffled map except where the doors were shuffled.
 - **Text** (`tests/v65t.py`, `tests/cx117.py`, `tests/textdump.py`): every between-level message rendered and compared; CODEX ally and item pages captured.
@@ -73,10 +73,11 @@ The test scripts need save states and the patched core, which are not in the rep
 |---|---|
 | `src/` | The 65816 source (asar) and the generated data it includes |
 | `inputs/third_party/` | kandowontu's FastROM patch, which `build.py` applies first |
-| `tools/` | Data generators, a 65816 disassembler (`dis65.py`) and interpreter (`sim65.py`) |
+| `tools/` | Data generators, a 65816 disassembler (`dis65.py`) and interpreter (`sim65.py`), and `overlap_check.py` (finds assembled blocks that run into each other) |
 | `tests/` | Emulator test scripts and the Snes9x core patch |
 | `docs/` | Research notes and the development history |
 
 ## Version history
+- **1.0.2:** fixes a freeze when START is pressed during the attract demo. See `CHANGELOG.md`.
 - **1.0.1:** fixes a possible freeze on RESUME after power-on. See `CHANGELOG.md`.
 - **1.0.0:** first public release.

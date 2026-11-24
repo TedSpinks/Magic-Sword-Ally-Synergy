@@ -1726,7 +1726,7 @@ CodexEnter:                 ; M=8 X=16, screen faded out: start the scene for pa
     sta $0412 : sta $045F : sta $0402 : sta $046C : sta $0424 : sta $046A
     lda.l !CodexPage
     cmp #$02 : beq .item            ; v101: magic items right after the Thief's Log
-    jsl $86E780                     ; v109: AllyOrder (options.asm): pages 3-10 in the order the allies first appear
+    jsl $86E7A0                     ; v109: AllyOrder (options.asm): pages 3-10 in the order the allies first appear
     lda #$0A : sta $045E
     sta $0401               ; scene $0A: ally description
     jml $80814D

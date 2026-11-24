@@ -1,0 +1,35 @@
+diff --git a/Libretro/libretro.cpp b/Libretro/libretro.cpp
+index 6ecae6d..375e1c8 100644
+--- a/Libretro/libretro.cpp
++++ b/Libretro/libretro.cpp
+@@ -6,6 +6,7 @@
+ #include "LibretroKeyManager.h"
+ #include "LibretroMessageManager.h"
+ #include "libretro.h"
++#include "../Core/Cpu.h"
+ #include "../Core/Console.h"
+ #include "../Core/Spc.h"
+ #include "../Core/Gameboy.h"
+@@ -792,3 +793,11 @@ extern "C" {
+ 		return 0;
+ 	}
+ }
++
++extern "C" {
++	RETRO_API void ms_cpu(unsigned* o)
++	{
++		CpuState st = _console->GetCpu()->GetState();
++		o[0] = ((unsigned)st.K << 16) | st.PC; o[1] = st.A; o[2] = st.X; o[3] = st.Y; o[4] = st.SP; o[5] = st.D; o[6] = st.DBR; o[7] = st.PS;
++	}
++}
+diff --git a/Libretro/link.T b/Libretro/link.T
+index b0c262d..5692f94 100644
+--- a/Libretro/link.T
++++ b/Libretro/link.T
+@@ -1,5 +1,5 @@
+ {
+-   global: retro_*;
++   global: ms_cpu; retro_*;
+    local: *;
+ };
+ 

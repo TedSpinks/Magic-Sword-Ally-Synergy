@@ -1,0 +1,98 @@
+diff --git a/bsnes/sfc/cpu/cpu.cpp b/bsnes/sfc/cpu/cpu.cpp
+index b6fec16..0b6e068 100644
+--- a/bsnes/sfc/cpu/cpu.cpp
++++ b/bsnes/sfc/cpu/cpu.cpp
+@@ -1,8 +1,11 @@
+ #include <sfc/sfc.hpp>
++#include <cstdlib>
++#include <cstdio>
+ 
+ namespace SuperFamicom {
+ 
+ CPU cpu;
++uint32 ms_ring[65536]; uint32 ms_ringpos = 0; static uint32 ms_last = 0xFFFFFFFF;
+ #include "dma.cpp"
+ #include "memory.cpp"
+ #include "io.cpp"
+@@ -34,6 +37,7 @@ auto CPU::Enter() -> void {
+ auto CPU::main() -> void {
+   if(r.wai) return instructionWait();
+   if(r.stp) return instructionStop();
++  { uint32 pcv = r.pc.d; if((pcv >> 5) != ms_last) { ms_last = pcv >> 5; ms_ring[ms_ringpos++ & 0xFFFF] = pcv; } }
+   if(!status.interruptPending) return instruction();
+ 
+   if(status.nmiPending) {
+@@ -93,6 +97,18 @@ auto CPU::power(bool reset) -> void {
+   bus.map(reader, writer, "00-3f,80-bf:4300-437f");
+ 
+   if(!reset) random.array(wram, sizeof(wram));
++  //test hook: MS_WRAM_JUNK=lo-hi (hex): keep random junk only in [lo,hi), fill the rest with 0 (MS_WRAM_FILL=hex byte overrides 0)
++  if(!reset) if(const char* e = getenv("MS_WRAM_JUNK")) {
++    static uint8 keep[128 * 1024]; for(unsigned i = 0; i < sizeof(wram); i++) keep[i] = 0;
++    unsigned fill = 0; if(const char* f = getenv("MS_WRAM_FILL")) sscanf(f, "%x", &fill);
++    const char* q = e; unsigned lo, hi; int n;
++    while(sscanf(q, "%x-%x%n", &lo, &hi, &n) == 2) { for(unsigned i = lo; i < hi && i < sizeof(wram); i++) keep[i] = 1; q += n; if(*q == ',') q++; else break; }
++    unsigned val = 0x100; if(const char* f = getenv("MS_WRAM_VAL")) sscanf(f, "%x", &val);
++    unsigned seed = 0; bool seeded = false; if(const char* f = getenv("MS_SEED")) { sscanf(f, "%u", &seed); seeded = true; }
++    uint32_t x = seed * 2654435761u + 88172645u; if(!x) x = 1;
++    for(unsigned i = 0; i < sizeof(wram); i++) { x ^= x << 13; x ^= x >> 17; x ^= x << 5; uint8 j = x >> 11;
++      if(!keep[i]) wram[i] = fill; else if(val < 0x100) wram[i] = val; else if(seeded) wram[i] = j; }
++  }
+ 
+   if(configuration.hacks.hotfixes) {
+     //Dirt Racer (Europe) relies on uninitialized memory containing certain values to boot without freezing.
+diff --git a/bsnes/sfc/interface/interface.cpp b/bsnes/sfc/interface/interface.cpp
+index 51d3b9b..9959280 100644
+--- a/bsnes/sfc/interface/interface.cpp
++++ b/bsnes/sfc/interface/interface.cpp
+@@ -342,3 +342,14 @@ auto Interface::setRunAhead(bool runAhead) -> void {
+ }
+ 
+ }
++
++//test-harness accessors (Magic Sword / ZAMN hack testing)
++namespace SuperFamicom {
++  void* ms_wram() { return cpu.wram; }
++  void* ms_sram() { return cartridge.ram.size() ? cartridge.ram.data() : nullptr; }
++  unsigned ms_sram_size() { return cartridge.ram.size(); }
++}
++namespace SuperFamicom {
++  void ms_cpu(unsigned* o) { o[0]=cpu.r.pc.d; o[1]=cpu.r.a.w; o[2]=cpu.r.x.w; o[3]=cpu.r.y.w; o[4]=cpu.r.s.w; o[5]=cpu.r.d.w; o[6]=cpu.r.b; o[7]=(uint8)cpu.r.p; }
++}
++namespace SuperFamicom { extern uint32 ms_ring[65536]; extern uint32 ms_ringpos; unsigned* ms_ring_ptr() { return (unsigned*)ms_ring; } unsigned ms_ring_pos() { return ms_ringpos; } }
+diff --git a/bsnes/target-libretro/libretro.cpp b/bsnes/target-libretro/libretro.cpp
+index 8010816..d0c4fbd 100644
+--- a/bsnes/target-libretro/libretro.cpp
++++ b/bsnes/target-libretro/libretro.cpp
+@@ -785,12 +785,21 @@ RETRO_API unsigned retro_get_region()
+ 
+ // Currently, there is no safe/sensible way to use the memory interface without severe hackery.
+ // Rely on higan to load and save SRAM until there is really compelling reason not to.
++namespace SuperFamicom { unsigned* ms_ring_ptr(); unsigned ms_ring_pos(); void ms_cpu(unsigned*); void* ms_wram(); void* ms_sram(); unsigned ms_sram_size(); }
+ RETRO_API void *retro_get_memory_data(unsigned id)
+ {
++	if(id == RETRO_MEMORY_SYSTEM_RAM) return SuperFamicom::ms_wram();
++	if(id == RETRO_MEMORY_SAVE_RAM && SuperFamicom::ms_sram_size()) return SuperFamicom::ms_sram();
+ 	return nullptr;
+ }
+ 
+ RETRO_API size_t retro_get_memory_size(unsigned id)
+ {
++	if(id == RETRO_MEMORY_SYSTEM_RAM) return 128 * 1024;
++	if(id == RETRO_MEMORY_SAVE_RAM) return SuperFamicom::ms_sram_size();
+ 	return 0;
+ }
++
++extern "C" RETRO_API void ms_cpu(unsigned* o) { SuperFamicom::ms_cpu(o); }
++extern "C" RETRO_API unsigned* ms_ring() { return SuperFamicom::ms_ring_ptr(); }
++extern "C" RETRO_API unsigned ms_ringpos() { return SuperFamicom::ms_ring_pos(); }
+diff --git a/bsnes/target-libretro/link.T b/bsnes/target-libretro/link.T
+index 9e82b5d..58850cf 100644
+--- a/bsnes/target-libretro/link.T
++++ b/bsnes/target-libretro/link.T
+@@ -1,4 +1,4 @@
+ {
+-   global: retro_*;
++   global: ms_cpu; ms_ring; ms_ringpos; retro_*;
+    local: *;
+ };

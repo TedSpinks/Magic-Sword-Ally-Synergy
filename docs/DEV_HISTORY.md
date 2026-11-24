@@ -1,6 +1,6 @@
 # Development history
 
-Internal build numbers (v45 to v124). Build v123 is release 1.0.0; build v124 is release 1.0.1. Addresses are SNES LoROM; "the author" is the project's author and playtester.
+Internal build numbers (v45 to v125). Build v123 is release 1.0.0; build v124 is release 1.0.1; build v125 is release 1.0.2. Addresses are SNES LoROM; "the author" is the project's author and playtester.
 
 ## v45
 Fixed: save slot screen (and the recorded best-credit floor) read the floor from $0404 (ones digit shown by the HUD) instead of $0403 (the floor number). FLOOR 22 showed as 02. Slot screen now reads run-state byte +$10 ($0403); RecordBest stores $0403. Existing best-credit floors already saved in SRAM keep the old (ones digit) value until that slot is replayed.
@@ -406,3 +406,11 @@ The SNES version has no boss on floor 17, so floor 16 no longer gets the BOSS AF
 - Fix (slot.asm): `SlotScene` calls `$80:F40C` (the game's queue-empty routine) first, as the CODEX entry already did (v82).
 - Checked: bsnes, resume flow, 15 random power-on patterns (seeds 10-24): v123 froze on 11, v124 on 0. Snes9x: slot screen and resumed floor pictures identical to v123, WRAM differs only in stack residue (`$01D9-$01F7`).
 - Not yet confirmed on Mesen-S: its title screen often ignored the scripted START presses (same for v123 and v124), so only one v123 freeze (the same upload wait) and one clean v124 resume were seen there.
+
+## v125 - fix: START during the gameplay demo froze the game (since v109)
+- Playtest report: pressing START to leave the attract loop right after the character screens (during the gameplay demo) locks the game for good.
+- Cause: a one-byte block collision. The demo's START exit (`DemoStart`, v108) ends with `JML $808964` at `$86:E77D-E780`; the CODEX ally-order code added in v109 (`AllyOrder`) started at `$86:E780` and overwrote that jump's last byte (the bank, `$80`) with its first opcode (`PHX`, `$DA`), so START jumped to `$DA:8964`. asar does not warn when one `org` block runs into the previous one, and the build's own overlap check doesn't see blocks that touch by a byte.
+- Found by pressing START through the attract loop on Snes9x (frame counter stopped on every press during the demo) and bisecting the saved builds: v108 fine, v109 through v124 locked. START on the ally screens, the items screen, the Hall of Heroes and the title was always fine.
+- Fix: `AllyOrder` moved to `$86:E7A0` (options.asm; the JSL in `CodexEnter`, slot.asm, follows). ROM difference to v124: the moved block (about 60 bytes) and the header checksum.
+- New tool: `tools/overlap_check.py` assembles the build with every `org` block's end printed and lists blocks whose address ranges overlap. It finds this bug in v124 and reports 123 blocks, 0 overlaps now.
+- Checked: START in the demo at 10 different times on Snes9x (title in every case, the frame counter runs), and at 3 times each on bsnes (random power-on RAM) and Mesen-S: back at the title; START on the ally screens, items screen, Hall of Heroes and demo 2: unchanged; the CODEX pages come up in the same order with identical screens (12 pages compared with v124).
